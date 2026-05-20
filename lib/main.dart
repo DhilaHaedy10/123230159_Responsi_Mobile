@@ -8,11 +8,9 @@ import 'main_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Inisialisasi Hive
   await Hive.initFlutter();
-  await Hive.openBox('libraryBox'); // Box untuk menyimpan game favorit
+  await Hive.openBox('FavBox'); // Membuka box 'FavBox' secara global
 
-  // Cek Sesi Login SharedPreferences
   final prefs = await SharedPreferences.getInstance();
   final email = prefs.getString('email');
 
@@ -26,7 +24,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Hydra Games',
+      title: 'Keripikroll',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF121212),
         primaryColor: Colors.blue,

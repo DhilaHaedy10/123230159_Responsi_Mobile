@@ -31,40 +31,49 @@ class _FavPageState extends State<FavPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Favorit Anda')),
+      appBar: AppBar(
+        title: const Text('Daftar Favorit', style: TextStyle(fontWeight: FontWeight.bold)),
+        automaticallyImplyLeading: false,
+      ),
       body: _currentUserEmail.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : ValueListenableBuilder(
               valueListenable: _FavBox.listenable(),
               builder: (context, Box box, _) {
-                // 1. Ambil semua data di dalam box Hive
                 final allItems = box.values.toList();
                 
-                // 2. Filter data: Hanya ambil data yang memiliki email user aktif saat ini
                 final userItems = allItems.where((item) {
                   return item != null && item['user_email'] == _currentUserEmail;
                 }).toList();
 
                 if (userItems.isEmpty) {
-                  return const Center(child: Text('Belum ada anime di favorit kamu.'));
+                  return const Center(child: Text('Belum ada anime favorit dimasukkan.'));
                 }
 
                 return ListView.builder(
                   itemCount: userItems.length,
                   itemBuilder: (context, index) {
                     final anime = Map<String, dynamic>.from(userItems[index]);
-                    // Menyusun key dinamis untuk proses penghapusan data
                     String compositeKey = "${_currentUserEmail}_${anime['id']}";
 
                     return ListTile(
-                      leading: Image.network(anime['coverImageTopOffset'], width: 80, fit: BoxFit.cover),
-                      title: Text(anime['canonicalTitle']),
-                      subtitle: Text('${anime['ageRating']} • ${anime['episodeCount']}'),
+                      leading: anime['thumbnail'] != null && anime['thumbnail'].toString().isNotEmpty
+                          ? Image.network(anime['thumbnail'], width: 50, height: 70, fit: BoxFit.cover)
+                          : const Icon(Icons.movie),
+                      title: Text(anime['title'] ?? 'No Title', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      // Menampilkan rating dan umur di halaman favorit
+                      subtitle: Text('⭐ ${anime['averageRating'] ?? '0.0'} • ${anime['ageRating'] ?? 'N/A'}'),
+                      // Tetap menyediakan opsi hapus instan melalui ikon sampah
                       trailing: IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => box.delete(compositeKey), // Hapus menggunakan composite key
+                        onPressed: () {
+                          box.delete(compositeKey);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Dihapus dari Favorit')),
+                          );
+                        },
                       ),
-                      onTap: () => Get.to(() => DetailPage(animeId: anime['id'])),
+                      onTap: () => Get.to(() => DetailPage(animeId: anime['id'].toString())),
                     );
                   },
                 );

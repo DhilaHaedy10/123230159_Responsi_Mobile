@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
 class DetailPage extends StatefulWidget {
-  final int animeId;
+  final String animeId; 
   const DetailPage({super.key, required this.animeId});
 
   @override
@@ -23,7 +23,6 @@ class _DetailPageState extends State<DetailPage> {
     _loadCurrentUser();
   }
 
-  // Mengambil info user yang sedang aktif login
   void _loadCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -31,31 +30,41 @@ class _DetailPageState extends State<DetailPage> {
     });
   }
 
-  // Generate Key unik gabungan email dan id game
   String _getCompositeKey() => "${_currentUserEmail}_${widget.animeId}";
 
-  // Cek apakah game ini ada di library milik user yang sedang aktif
   bool _isInFavorite() {
     return _FavBox.containsKey(_getCompositeKey());
   }
 
-  void _toggleFavorite(Map<String, dynamic> anime) {
+  // Fungsi Toggle: Bisa tambah dan bisa hapus dari Detail Page menggunakan ikon Love
+  void _toggleFavorite(Map<String, dynamic> animeData, Map<String, dynamic> attributes) {
     if (_currentUserEmail.isEmpty) return;
 
+    String key = _getCompositeKey();
     setState(() {
-      String key = _getCompositeKey();
       if (_isInFavorite()) {
         _FavBox.delete(key);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Dihapus dari Favorit')),
+        );
       } else {
-        // Simpan data dengan menyisipkan identitas pemilik data ('user_email')
+        String posterUrl = attributes['posterImage'] != null 
+            ? attributes['posterImage']['small'] 
+            : '';
+
         _FavBox.put(key, {
-          'id': anime['id'],
+          'id': animeData['id'],
           'user_email': _currentUserEmail, 
-          'title': anime['canonicalTitle'],
-          'thumbnail': anime['coverImageTopOffset'],
-          'ageRating': anime['ageRating'],
-          'episodes': anime['episodeCount'],
+          'title': attributes['canonicalTitle'] ?? 'No Title',
+          'thumbnail': posterUrl,
+          'averageRating': attributes['averageRating'] ?? '0.0', 
+          'ageRating': attributes['ageRating'] ?? 'N/A', 
+          'episodes': attributes['episodeCount']?.toString() ?? 'N/A',
         });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Berhasil ditambahkan ke Favorit!')),
+        );
       }
     });
   }
@@ -71,46 +80,97 @@ class _DetailPageState extends State<DetailPage> {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (!snapshot.hasData) {
+            return const Center(child: Text('Data tidak ditemukan'));
           }
 
           final anime = snapshot.data!;
-          final infavorite = _isInFavorite();
+          final attributes = anime['attributes'] ?? {};
+          final isFav = _isInFavorite();
+
+          String posterUrl = '';
+          if (attributes['posterImage'] != null) {
+            posterUrl = attributes['posterImage']['large'] ?? '';
+          }
 
           return SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Hero(
-                  tag: 'anime-${anime['id']}',
-                  child: Image.network(anime['coverImageTopOffset'], width: double.infinity, fit: BoxFit.cover),
-                ),
+                posterUrl.isNotEmpty
+                    ? Image.network(posterUrl, width: double.infinity, height: 320, fit: BoxFit.cover)
+                    : Container(height: 250, color: Colors.grey[900]),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(anime['title'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Text('${anime['ageRating']} • ${anime['episodeCount']}',style: const TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              attributes['canonicalTitle'] ?? 'No Title', 
+                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          // Ikon Love untuk Tambah/Hapus dari Favorit langsung di Detail Page
+                          IconButton(
+                            icon: Icon(
+                              isFav ? Icons.favorite : Icons.favorite_border,
+                              color: isFav ? Colors.red : Colors.grey,
+                              size: 30,
+                            ),
+                            onPressed: () => _toggleFavorite(anime, attributes),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '⭐ ${attributes['averageRating'] ?? '0.0'}',
+                        style: const TextStyle(fontSize: 18, color: Colors.amber, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Total: ${attributes['episodeCount'] ?? 'N/A'} Episodes',
+                        style: const TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      // Menampilkan data Age Rating (Contoh: PG-13, R, dll)
+                      Text(
+                        'Age Rating: ${attributes['ageRating'] ?? 'N/A'}',
+                        style: const TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 20),
                       
-                      // Tombol Berubah Status Sesuai Akun
+                      // BUTTON NONTON BERSIFAT STATIC (Tidak terpengaruh status favorit)
                       SizedBox(
                         width: double.infinity,
-                        height: 45,
+                        height: 48,
                         child: ElevatedButton(
-                          onPressed: () => _toggleFavorite(anime),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _isInFavorite() ? Colors.grey[800] : Colors.blue,
+                            backgroundColor: Colors.blue,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          child: Text(infavorite ? '✓ Masuk ke Favorite' : '+ Tambah Favorite', style: const TextStyle(color: Colors.white)),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar( SnackBar(content: 
+                            Text("Memutar anime ${attributes['canonicalTitle']}...")),
+                            );
+                          },
+                          child: const Text(
+                            'Nonton', 
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
                         ),
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       const Text('Overview', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      Text(anime['synopsis'] ?? ''),
+                      Text(
+                        attributes['synopsis'] ?? 'Tidak ada deskripsi.',
+                        style: const TextStyle(fontSize: 14, height: 1.5, color: Colors.white70),
+                      ),
                     ],
                   ),
                 ),
@@ -122,4 +182,3 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 }
-
